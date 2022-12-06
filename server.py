@@ -12,19 +12,20 @@ logger.setLevel(logging.INFO)
 class Server:
     def __init__(self, host: str = HOST, port: int = PORT):
         self.host: str = host
-        self.port: str = port
+        self.port: int = port
         self.clients_dict: dict[str, tuple[StreamReader, StreamWriter]] = {}
 
     async def connecting_clients(
             self, reader: StreamReader, writer: StreamWriter) -> None:
-        address: tuple = writer.get_extra_info('peername')
-        client_host: str = address[0]
-        client_port: int = address[1]
-        client: str = client_host + str(client_port)
-        if client not in self.clients_dict.keys():
-            self.clients_dict[client] = (reader, writer)
+        # if add 'self.' -> get last_client, not current
+        current_address: tuple = writer.get_extra_info('peername')
+        current_client_host: str = current_address[0]
+        current_client_port: int = current_address[1]
+        current_client: str = current_client_host + str(current_client_port)
+        if current_client not in self.clients_dict.keys():
+            self.clients_dict[current_client] = (reader, writer)
         logger.info('Client connected at %(host)s:%(port)s',
-                    {'host': client_host, 'port': client_port})
+                    {'host': current_client_host, 'port': current_client_port})
 
         while True:
             data: bytes = await reader.read(1024)
@@ -32,12 +33,12 @@ class Server:
                 break  # User disconnection
             msg: str = data.decode()
             if msg.startswith(PRIVATE):
-                self.private_msg(msg)
+                await self.private_msg(msg, current_client)
             else:
-                await self.public_msg(msg)
+                await self.public_msg(msg, current_client)
 
         logger.info('Client disconnected at %(host)s:%(port)s',
-                    {'host': client_host, 'port': client_port})
+                    {'host': current_client_host, 'port': current_client_port})
         writer.close()
 
     async def start(self) -> None:
@@ -49,13 +50,15 @@ class Server:
         async with srv:
             await srv.serve_forever()
 
-    async def public_msg(self, msg_to_send: str) -> None:
+    async def public_msg(self, msg: str, current_client: str) -> None:
         for client in self.clients_dict.keys():
-            writer: StreamWriter = self.clients_dict[client][1]
-            writer.write(msg_to_send.encode())
-            await writer.drain()
+            if client != current_client:
+                msg_to_send = current_client + ': ' + msg
+                writer: StreamWriter = self.clients_dict[client][1]
+                writer.write(msg_to_send.encode())
+                await writer.drain()
 
-    def private_msg(self, msg_to_send: str) -> None:
+    async def private_msg(self, msg: str, current_client: str) -> None:
         pass
 
 

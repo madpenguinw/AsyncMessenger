@@ -19,7 +19,7 @@ class Client:
     async def write_msg(self):
         msg_to_write: str = ''
         while msg_to_write != DISCONNECT:
-            message = await ainput('<Enter your message:> \n')  # Delete on prod
+            message = await ainput('')
             if message == DISCONNECT:
                 print('<Disconnecting...>')
                 self.disconnect = True
@@ -27,7 +27,6 @@ class Client:
                 break
             self.writer.write(message.encode())
             await self.writer.drain()
-            print('<Message sent>')
             await asyncio.sleep(0.1)  # Needed for task changing
 
     async def read_msg(self):
@@ -35,10 +34,10 @@ class Client:
         while True:
             if self.disconnect:
                 break
-            print('<Reading message...>')  # Delete on prod
             msg_to_read = await self.reader.read(1024)
             if msg_to_read:
-                print(f'<Received: {msg_to_read.decode()}>')
+                print(msg_to_read.decode())
+                await asyncio.sleep(0.1)  # Mb useless
         self.writer.close()
 
 
