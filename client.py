@@ -21,7 +21,7 @@ class Client:
         while msg_to_write != DISCONNECT:
             message = await ainput('')
             if message == DISCONNECT:
-                print('<Disconnecting...>')
+                print('<Отключение от сервера...>')
                 self.disconnect = True
                 self.writer.close()
                 break
