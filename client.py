@@ -2,7 +2,7 @@ import asyncio
 
 from aioconsole import ainput
 
-from constants import HOST, PORT, DISCONNECT
+from constants import DISCONNECT, HOST, PORT
 
 
 class Client:
