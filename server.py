@@ -6,10 +6,11 @@ from collections import deque
 import app_logger
 from constants import (ADD_TO_CHAT, ADDED_TO_CHAT, ADMIN_OFFLINE,
                        ALREADY_IN_CHAT, AUTHORIZATION, AUTHORIZATION_FAILED,
-                       CHAT, CHAT_CREATED, CHAT_EXIST, CHAT_NOT_EXIST, CHATS,
-                       CREATE, EMPTY_HISTORY, GREETING, HISTORY, HOST, JOIN,
-                       JOIN_REFUSED, LOGIN, MAXLENGTH, ME, NOT_REGISTERED,
-                       PASSWORD, PASSWORED_CHANGED, PORT, PRIVATE, REGISTERED,
+                       CHAT, CHAT_CONNECTED, CHAT_CREATED, CHAT_EXIST,
+                       CHAT_NOT_EXIST, CHATS, CREATE, EMPTY_HISTORY, EXIT,
+                       GREETING, HISTORY, HOST, JOIN, JOIN_REFUSED, LOGIN,
+                       MAXLENGTH, ME, NOT_IN_CHAT, NOT_REGISTERED, PASSWORD,
+                       PASSWORED_CHANGED, PORT, PRIVATE, REGISTERED,
                        REGISTRATION, REGISTRATION_FAILED, RETRY, RULES,
                        SUCCESSFULLY_AUTHORIZED, SUCCESSFULLY_REGISTERED,
                        USERNAME, WRONG_COMMAND, YES)
@@ -25,67 +26,118 @@ class Server:
     def __init__(self, host: str = HOST, port: int = PORT):
         self.host: str = host
         self.port: int = port
-        self.address_writer_reader: dict[str, tuple[StreamWriter, StreamReader]] = {}
+        self.address_writer_reader: dict[
+            str, tuple[StreamWriter, StreamReader]] = {}
         self.login_password: dict[str, str] = {}
         self.login_address: dict[str, list[str]] = {}
-        self.chat_login: dict[str, tuple[str, list[str]]] = {}
+        self.chat_logins: dict[str, tuple[str, list[str]]] = {}
+        self.login_chats: dict[str, list[str]] = {}
         self.short_history: deque = deque(maxlen=MAXLENGTH)
 
-    async def create_chat(self, msg: str, login: str, writer: StreamWriter) -> None: # TODO if msg.startswith(CREATE):
+    async def create_chat(
+            self, msg: str, login: str, writer: StreamWriter) -> None:
         """User can create chat and become its admin."""
-        chat: str = msg.split(' ', maxsplit=1)
-        if chat in self.chat_login.keys():
+        chat: str = msg.split(' ', maxsplit=1)[1]
+        logger.info('Attempt %(login)s create chat %(chat)s',
+                    {'login': login, 'chat': chat})  # DELETE
+        print(-1)
+        if chat in self.chat_logins.keys():
+            print(0)
             await self.write_msg(CHAT_EXIST, writer=writer)
         else:
             # first el in tuple -> chat admin
-            self.chat_login[chat] = (login, [login])
+            self.chat_logins[chat] = (login, [login])
+            self.login_chats[login].append(chat)
             await self.write_msg(CHAT_CREATED, writer=writer)
-    
-    async def join_chat(self, msg: str, login: str, writer: StreamWriter) -> bool:
+            logger.info('User %(login)s created chat %(chat)s',
+                        {'login': login, 'chat': chat})
+
+    async def join_chat(
+            self, msg: str, login: str, writer: StreamWriter) -> None:
         """Send to admin request for joining to chat."""
         # 1 если уже есть в чате
-        chat: str = msg.split(' ', maxsplit=1)
-        if chat in self.chat_login.keys():
-            if login in self.chat_login[chat][1]:
+        chat: str = msg.split(' ', maxsplit=1)[1]
+        if chat in self.chat_logins.keys():
+            if login in self.chat_logins[chat][1]:
                 await self.write_msg(ALREADY_IN_CHAT, writer=writer)
             else:
-                admin = self.chat_login[chat][0]
+                admin = self.chat_logins[chat][0]
                 if admin in self.login_address.keys():
                     if self.login_address[login]:
-                        for address in self.login_address[login]:  # First answered admins client should break the awaiting
+                        for address in self.login_address[login]:
+                            # First answered admins client should
+                            # break the awaiting
                             await self.write_msg(ADD_TO_CHAT, address=admin)
                             answer = await self.read_msg(address=address)
                             if answer == YES:
-                                self.chat_login.append(login)
-                                await self.write_msg(ADDED_TO_CHAT, writer=writer)
+                                self.chat_logins.append(login)
+                                self.login_chats[login].append(chat)
+                                logger.info(
+                                    'User %(login)s joined chat %(chat)s',
+                                    {'login': login, 'chat': chat})
+                                await self.write_msg(
+                                    ADDED_TO_CHAT, writer=writer)
                                 break
                             else:
-                                await self.write_msg(JOIN_REFUSED, writer=writer)
+                                await self.write_msg(
+                                    JOIN_REFUSED, writer=writer)
                                 break
                     else:
                         await self.write_msg(ADMIN_OFFLINE, writer=writer)
                 else:
                     await self.write_msg(ADMIN_OFFLINE, writer=writer)
         else:
-             await self.write_msg(CHAT_NOT_EXIST, writer=writer)
+            await self.write_msg(CHAT_NOT_EXIST, writer=writer)
 
-    async def chat_msg(self, login: str, writer: StreamWriter):
-        # TODO Проверка, есть ли чат
-        
-        # TODO Проверка, есть ли отправитель в списке чата
-        
-        # TODO Получить все логины в чате, кроме отправителя
-        
-        # TODO На все адреса всех логинов отправить сообщение
-        
-        # TODO Отправителю отправить сообщение самому себе
+    async def chat_msg(self, msg: str, login: str) -> None:
+        chat_msg: str = ''
+        chat: str = msg.split(' ', maxsplit=1)[1]
+        if chat in self.chat_logins.keys():
+            if login in self.chat_logins[chat][1]:
+                for address in self.login_address[login]:
+                    await self.write_msg(CHAT_CONNECTED, address=address)
+                    logger.info(
+                        'User "%(login)s" connected to private chat '
+                        '"%(chat)s"',
+                        {'login': login, 'chat': chat})
 
-        pass
-    
-    async def show_chats(self,  login: str, writer: StreamWriter):
+                    while chat_msg != EXIT:
+                        chat_msg = await self.read_msg(address=address)
+
+                        if chat_msg == EXIT:
+                            logger.info(
+                                'User "%(login)s" disconnected from private '
+                                'chat "%(chat)s"',
+                                {'login': login, 'chat': chat})
+                            break
+
+                        msg_to_others = \
+                            login + ': ' + chat_msg + ' | private chat' + chat
+                        for user in self.chat_logins[chat][1]:
+                            if user != login:
+                                if self.login_address[user]:
+                                    for client in self.login_address[user]:
+                                        await self.write_msg(
+                                            msg_to_others, address=client)
+
+                        msg_to_myself = \
+                            ME + ': ' + chat_msg + ' | private chat' + chat
+                        for my_address in self.login_address[login]:
+                            if my_address != address:
+                                await self.write_msg(msg_to_myself)
+                    break
+            else:
+                for address in self.login_address[login]:
+                    await self.write_msg(NOT_IN_CHAT, address=address)
+        else:
+            for address in self.login_address[login]:
+                await self.write_msg(CHAT_NOT_EXIST, address=address)
+
+    async def show_chats(self, login: str):
         """Shows all chats the user is a member of"""
-        # send to himself
-        pass
+        for chat in self.login_chats[login]:
+            for address in self.login_address[login]:
+                await self.write_msg(chat, address=address)
 
     async def start(self) -> None:
         """Start the server."""
@@ -106,6 +158,7 @@ class Server:
         address = self.get_clients_address(writer)
         self.address_writer_reader[address] = (writer, reader)
         login: str = await self.greeting_client(writer, reader)
+        self.login_chats[login] = []
 
         logger.info(
             'Client connected at %(address)s as %(login)s',
@@ -119,8 +172,16 @@ class Server:
             msg: str = await self.read_msg(reader=reader)
             if not msg:
                 break  # User disconnection
-            if msg.startswith(PRIVATE):
+            elif msg.startswith(PRIVATE):
                 await self.private_msg(msg, login, address)
+            elif msg.startswith(CREATE):
+                await self.create_chat(msg, login, writer)
+            elif msg.startswith(JOIN):
+                await self.join_chat(msg, login, writer)
+            elif msg.startswith(CHAT):
+                await self.join_chat(msg, login)
+            elif msg == CHATS:
+                await self.show_chats(login)
             else:
                 msg_to_save: str = login + ': ' + msg
                 self.short_history.append(msg_to_save)
@@ -169,7 +230,7 @@ class Server:
             msg = REGISTERED
         else:
             msg = PASSWORED_CHANGED
-            logger.info('User %(login)s changed password', {'login', login})
+            logger.info('User %(login)s changed password', {'login': login})
         self.login_password[login] = password
         return msg
 
@@ -253,7 +314,7 @@ class Server:
                 self.extend_login_address(login, address)
                 success = True
                 logger.info('Successfully registrated user %(login)s',
-                            {'login', login})
+                            {'login': login})
         return login
 
     async def authorization(self, writer: StreamWriter,
@@ -273,7 +334,7 @@ class Server:
                 self.extend_login_address(login, address)
                 success = True
                 logger.info('Successfully authorized user %(login)s',
-                            {'login', login})
+                            {'login': login})
             else:
                 msg = AUTHORIZATION_FAILED
                 await self.write_msg(msg, writer=writer)
@@ -292,8 +353,8 @@ class Server:
         Read new message.
         """
         if not reader and not address:
-             logger.error('Reader did not read message')
-             pass
+            logger.error('Reader did not read message')
+            pass
         elif address and not reader:
             try:
                 reader: StreamReader = self.address_writer_reader[address][1]
@@ -349,22 +410,26 @@ class Server:
             msg: str = msg.replace(PRIVATE, '')
             login, msg = msg.split(' ', maxsplit=1)
             if login == current_login:
+                # Msg to current user himself
                 adresses: list[str] = self.login_address[login]
                 for address in adresses:
                     if address != current_address:
-                        msg_to_send: str = ME + ': ' + msg
+                        msg_to_send: str = ME + ': ' + msg + ' | private msg'
                         await self.write_msg(msg_to_send, address=address)
             else:
                 if login in self.login_address.keys():
                     recipient_adresses: list[str] = self.login_address[login]
                     for address in recipient_adresses:
-                        msg_to_send: str = current_login + ': ' + msg
+                        msg_to_send: str = \
+                            current_login + ': ' + msg + ' | private msg'
                         await self.write_msg(msg_to_send, address=address)
                     sender_adresses: list[str] = \
                         self.login_address[current_login]
                     for address in sender_adresses:
+                        # Msg to current user other clients
                         if address != current_address:
-                            msg_to_send: str = ME + ': ' + msg
+                            msg_to_send: str = \
+                                ME + ': ' + msg + ' | private msg'
                             await self.write_msg(msg_to_send, address=address)
                 else:
                     msg_to_send: str = USERNAME + login + NOT_REGISTERED
