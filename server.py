@@ -111,13 +111,16 @@ class Server:
         """Greeting new clients on server."""
         await self.write_msg_to_address(GREETING, address)
         while True:
-            answer: str = await self.read_msg(address)
-            if answer == REGISTRATION:
-                login: str = await self.registration(address)
-                break
-            elif answer == AUTHORIZATION:
-                login = await self.authorization(address)
-                break
+            match answer := await self.read_msg(address):
+                # Я сделал, как вы попросили, но в таком решении мне не нравятся два момента:
+                # 1) в конструкции case я не могу использовать переменные, в частности REGISTRATION и AUTHORIZATION
+                # 2) конструкция match мне подчеркивается линтером, хотя код при этом работает ¯\_(ツ)_/¯ 
+                case '/register':
+                    login: str = await self.registration(address)
+                    break
+                case '/authorize':
+                    login = await self.authorization(address)
+                    break
             await self.write_msg_to_address(WRONG_COMMAND + RETRY, address)
         return login
 
