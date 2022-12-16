@@ -2,7 +2,7 @@ import asyncio
 
 from aioconsole import ainput
 
-from constants import DISCONNECT, HOST, PORT
+from constants import DISCONNECT, HOST, MAXBYTES, PORT
 
 
 class Client:
@@ -34,10 +34,9 @@ class Client:
         while True:
             if self.disconnect:
                 break
-            msg_to_read = await self.reader.read(1024)
+            msg_to_read = await self.reader.read(MAXBYTES)
             if msg_to_read:
                 print(msg_to_read.decode())
-                await asyncio.sleep(0.1)  # Mb useless
         self.writer.close()
 
 
