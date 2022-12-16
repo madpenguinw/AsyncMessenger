@@ -17,8 +17,7 @@ class Client:
         await asyncio.gather(self.write_msg(), self.read_msg())
 
     async def write_msg(self):
-        msg_to_write: str = ''
-        while msg_to_write != DISCONNECT:
+        while True:
             message = await ainput('')
             if message == DISCONNECT:
                 print('<Отключение от сервера...>')
@@ -30,13 +29,12 @@ class Client:
             await asyncio.sleep(0.1)  # Needed for task changing
 
     async def read_msg(self):
-        msg_to_read: str = ''
         while True:
             if self.disconnect:
                 break
-            msg_to_read = await self.reader.read(MAXBYTES)
-            if msg_to_read:
+            if msg_to_read := await self.reader.read(MAXBYTES):
                 print(msg_to_read.decode())
+                await asyncio.sleep(0.1)  # Hope this will help u to run code
         self.writer.close()
 
 

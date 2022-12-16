@@ -3,6 +3,8 @@ import logging
 from asyncio.streams import StreamReader, StreamWriter
 from collections import deque
 
+# импорт ниже используется, хоть и не подсвечен.
+# Я импортирую в этот файл необходимый для логирования код из файла app_logger
 import app_logger
 from constants import (ADD, ALREADY_IN_CHAT, AUTHORIZATION,
                        AUTHORIZATION_FAILED, CHAT, CHAT_CONNECTED,
@@ -95,6 +97,8 @@ class Server:
                 await self.public_msg(msg, login, address)
 
         self.delete_login_address(login, address)
+        # Не понял ваш комментарий. Это и есть отдельный метод.
+        # Он удаляет из отключившиеся клиенты пользователя из списка
         writer.close()
 
         logger.info(
@@ -191,7 +195,7 @@ class Server:
         msg: str = ''
 
         while not success:
-            
+
             login: str = ''
             password: str = ''
 
@@ -412,9 +416,6 @@ class Server:
                 logger.error('Reader did not read message')
                 pass
             answer = data.decode()
-        except KeyError as error:
-            logger.error(error)
-            pass
         except Exception as error:
             logger.error(error)
             pass
