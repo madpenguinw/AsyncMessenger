@@ -112,9 +112,12 @@ class Server:
         await self.write_msg_to_address(GREETING, address)
         while True:
             match answer := await self.read_msg(address):
-                # Я сделал, как вы попросили, но в таком решении мне не нравятся два момента:
-                # 1) в конструкции case я не могу использовать переменные, в частности REGISTRATION и AUTHORIZATION
-                # 2) конструкция match мне подчеркивается линтером, хотя код при этом работает ¯\_(ツ)_/¯ 
+                # Я сделал, как вы попросили, но в таком решении
+                # мне не нравятся два момента:
+                # 1) в конструкции case я не могу использовать переменные,
+                # в частности REGISTRATION и AUTHORIZATION
+                # 2) конструкция match мне подчеркивается линтером,
+                # так как answer больше нигде не используется ¯\_(ツ)_/¯
                 case '/register':
                     login: str = await self.registration(address)
                     break
