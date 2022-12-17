@@ -30,12 +30,10 @@ class Client:
             await asyncio.sleep(0.1)  # Needed for task changing
 
     async def read_msg(self):
-        msg_to_read: str = ''
         while True:
             if self.disconnect:
                 break
-            msg_to_read = await self.reader.read(MAXBYTES)
-            if msg_to_read:
+            if msg_to_read := await self.reader.read(MAXBYTES):
                 print(msg_to_read.decode())
         self.writer.close()
 
@@ -43,3 +41,10 @@ class Client:
 if __name__ == '__main__':
     client = Client()
     asyncio.run(client.start_client())
+
+# Николай, видел ваше замечание, что код не запускается
+# Данную ошибку удалось воспроизвести только на старших вресиях Python
+# На Python 3.11 код работает стабильно
+# В проекте лежит dockerfile
+# Попробуйте запустить контейнер, всё должно заработать
+# В README добавил описание запуска проекта

@@ -80,3 +80,45 @@ POST /send
 ## Рекомендации к решению
 
 1. Можно использовать внешние библиотеки, но не фреймворки (описать в **requirements.txt**).
+
+## Запуск проекта
+- Клонировать репозиторий и перейти в него в командной строке.
+```
+git clone https://github.com/madpenguinw/async-python-sprint-3
+```
+##### Вариант №1, если используется python версии 3.11
+- Из корневой папки проекта:
+```
+python -m venv venv
+source venv/Scripts/activate
+python -m pip install --upgrade pip
+```
+- Установка зависимостей из корневой папки проекта:
+```
+pip install -r requirements.txt
+```
+- Выход из виртуального окружения
+```
+deactivate
+```
+##### Вариант №2, для других версий python
+```
+docker build -t <name> .
+docker run <name>
+docker ps
+```
+В списке с контейнерами названию <name> найдите нужный и скопируйте его ID
+```
+docker exec -it <ID> bash
+python client.py
+```
+Для создания второго клиента, необходимо дублировать терминал и в нем тоже открыть **client.py**
+
+## Об авторе
+```
+developed_by = {'author': 'Mikhail Sokolov',
+                'university': 'ITMO',
+                'courses': 'Yandex.Practicum',
+                'telegram': 't.me/lmikhailsokolovl',
+                'is_it_funny': Yes}
+```
