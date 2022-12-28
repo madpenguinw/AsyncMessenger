@@ -94,6 +94,9 @@ class Server:
                     await self.add_to_chat(msg, login)
                 case ['/exit']:
                     pass
+                case ['/change_password', *words]:
+                    await self.write_msg_to_myself(msg, address, login)
+                    await self.fill_login_password(login, address, words)
                 case [*words] if msg.startswith('/'):
                     await self.write_msg_to_myself(msg, address, login)
                     await self.write_msg_to_address(WRONG_COMMAND, address)
@@ -129,13 +132,9 @@ class Server:
                 # if client disconnected during greeting
                 return ''
             match answer:
-                # Я сделал, как вы попросили, но в таком решении
-                # мне не нравятся 2 момента:
-                # 1) в конструкции case я не могу использовать переменные,
-                # в частности REGISTRATION и AUTHORIZATION
-                # при выполнении которого будет исполнен код
-                # 2) конструкция match мне подчеркивается линтером,
-                # так как answer больше нигде не используется ¯\_(ツ)_/¯
+                # Я исправил замечание, но в таком решении мне не нравится,
+                # что в конструкции match-case я не могу использоать
+                # переменные, в частности REGISTRATION и AUTHORIZATION
                 case '/register':
                     login: str = await self.registration(address)
                     break
@@ -156,7 +155,8 @@ class Server:
                 return True
         return False
 
-    def fill_login_password(self, login: str, password: str) -> str:
+    async def fill_login_password(
+            self, login: str, address: str, password: str | list[str]) -> str:
         """
         Set or change user's password.
         """
@@ -164,8 +164,15 @@ class Server:
         if login not in self.login_password.keys():
             msg = REGISTERED
         else:
+            if isinstance(password, list):
+                password_str: str = ''
+                for word in password:
+                    password_str += word
+                password: str = password_str
             msg = PASSWORED_CHANGED
             logger.info('User %(login)s changed password', {'login': login})
+            await self.write_msg_to_address(msg, address)
+            await self.write_msg_to_myself(msg, address, login)
         self.login_password[login] = password
         return msg
 
@@ -241,7 +248,7 @@ class Server:
             else:
                 msg = SUCCESSFULLY_REGISTERED
                 await self.write_msg_to_address(msg, address)
-                self.fill_login_password(login, password)
+                await self.fill_login_password(login, address, password)
                 self.extend_login_address(login, address)
                 success = True
                 logger.info('Successfully registrated user %(login)s',
@@ -331,7 +338,8 @@ class Server:
                     )
 
         else:
-            await self.write_msg(f'<Чат {chat} не существует> \n', login)
+            await self.write_msg(
+                f'<Чат "{chat}" не существует>\n' + CHAT_NOT_EXIST, login)
 
     async def add_to_chat(self, msg: str, admin: str) -> None:
         """Add user to chat."""
