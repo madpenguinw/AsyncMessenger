@@ -107,7 +107,7 @@ docker build -t <name> .
 docker run <name>
 docker ps
 ```
-В списке с контейнерами названию <name> найдите нужный и скопируйте его ID
+В списке с контейнерами по названию <name> найдите нужный и скопируйте его ID
 ```
 docker exec -it <ID> bash
 python client.py

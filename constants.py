@@ -9,10 +9,10 @@ PRIVATE: str = '@'
 DISCONNECT: str = '/disconnect'
 REGISTRATION: str = '/register'
 AUTHORIZATION: str = '/authorize'
-CREATE: str = '/create '
-JOIN: str = '/join '
-ADD: str = '/add '
-CHAT: str = '/chat '
+CREATE: str = '/create'
+JOIN: str = '/join'
+ADD: str = '/add'
+CHAT: str = '/chat'
 EXIT: str = '/exit'
 CHATS: str = '/chats'
 
@@ -34,7 +34,7 @@ RULES: str = (
     f'"{PRIVATE}имя_пользователя" и через пробел введите свое сообщение> \n'
     f'<3 - Чтобы создать чат, введите "{CREATE} <название_чата>"> \n'
     '<4 - Чтобы добавить пользователя в чат, введите '
-    f'"{ADD}{USER_EQ}<имя_пользователя> {CHAT_EQ}<название_чата>"> \n'
+    f'"{ADD} {USER_EQ}<имя_пользователя> {CHAT_EQ}<название_чата>"> \n'
     f'<5 - Чтобы запросить доступ к чату, введите "{JOIN} <название_чата>"> \n'
     f'<6 - Чтобы подключиться к нему, введите "{CHAT} <название_чата>"> \n'
     f'<7 - Чтобы отключиться от чата, введите "{EXIT}"> \n'
@@ -66,7 +66,7 @@ REGISTRATION_FAILED: str = (
 )
 
 EMPTY_HISTORY: str = '\n<История чата пуста> \n'
-HISTORY: str = '\n<История чата: > \n'
+HISTORY: str = '\n<История чата>: \n'
 
 REGISTERED: str = '\n<Регистрация прошла успешно> \n'
 AUTHORIZED: str = '\n<Регистрация прошла успешно> \n'
@@ -99,7 +99,7 @@ YOU_SUCCESSFULLY_ADDED = '<Вы были успешно добавлены в ч
 ADDED_TO_CHAT: str = '<Вы были успешно добавлены в чат> \n'
 
 CHAT_CONNECTED: str = (
-    '<Вы вошли в приватный чат, все последующие сообщения '
+    '\n<Вы вошли в приватный чат, все последующие сообщения '
     'будут отправляться в него> \n'
     '<Находясь здесь нельзя писать личные сообщения и добавлять '
     'новых пользователей в чаты> \n'

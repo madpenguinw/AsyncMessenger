@@ -2,7 +2,7 @@ import asyncio
 
 from aioconsole import ainput
 
-from constants import DISCONNECT, HOST, MAXBYTES, PORT
+from constants import CHAT, DISCONNECT, EXIT, HOST, MAXBYTES, PORT
 
 
 class Client:
@@ -33,8 +33,18 @@ class Client:
             if self.disconnect:
                 break
             if msg_to_read := await self.reader.read(MAXBYTES):
-                print(msg_to_read.decode())
-                await asyncio.sleep(0.1)  # Hope this will help u to run code
+                decoded_msg = msg_to_read.decode()
+                if decoded_msg.startswith(CHAT):
+                    # for clients synchronization in private chats
+                    command = '/silent_chat ' + decoded_msg
+                    self.writer.write(command.encode())
+                    await self.writer.drain()
+                    print(decoded_msg)
+                elif decoded_msg.startswith(EXIT):
+                    self.writer.write(EXIT.encode())
+                    await self.writer.drain()
+                else:
+                    print(decoded_msg)
         self.writer.close()
 
 
@@ -42,8 +52,8 @@ if __name__ == '__main__':
     client = Client()
     asyncio.run(client.start_client())
 
-# Николай, видел ваше замечание, что код не запускается
-# Данную ошибку удалось воспроизвести только на старших вресиях Python
+# Уважаемый ревьювер, видел замечание, что код не запускается
+# Данную ошибку удалось воспроизвести только на более старых версиях Python
 # На Python 3.11 код работает стабильно
 # В проекте лежит dockerfile
 # Попробуйте запустить контейнер, всё должно заработать

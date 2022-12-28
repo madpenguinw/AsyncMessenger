@@ -7,17 +7,16 @@ from collections import deque
 # Я импортирую в этот файл необходимый для логирования код из файла app_logger
 import app_logger
 from constants import (ADD, ALREADY_IN_CHAT, AUTHORIZATION,
-                       AUTHORIZATION_FAILED, CHAT, CHAT_CONNECTED,
-                       CHAT_CREATED, CHAT_EQ, CHAT_EXIST, CHAT_NOT_EXIST,
-                       CHATS, CLOSE, CREATE, DISCONNECT_FROM_CHAT,
-                       EMPTY_HISTORY, EXIT, GREETING, HISTORY, HOST, JOIN,
-                       LOGIN, MAXBYTES, MAXLENGTH, ME, NO_CHAT, NOT_IN_CHAT,
-                       NOT_REGISTERED, PASSWORD, PASSWORED_CHANGED, PORT,
-                       PRIVATE, REGISTERED, REGISTRATION, REGISTRATION_FAILED,
-                       RETRY, RULES, SUCCESSFULLY_AUTHORIZED,
-                       SUCCESSFULLY_REGISTERED, USER_EQ,
-                       USER_SUCCESSFULLY_ADDED, USERNAME, WRONG_COMMAND,
-                       YOU_SUCCESSFULLY_ADDED)
+                       AUTHORIZATION_FAILED, CHAT_CONNECTED, CHAT_CREATED,
+                       CHAT_EQ, CHAT_EXIST, CHAT_NOT_EXIST, CLOSE,
+                       DISCONNECT_FROM_CHAT, EMPTY_HISTORY, EXIT, GREETING,
+                       HISTORY, HOST, LOGIN, MAXBYTES, MAXLENGTH, ME, NO_CHAT,
+                       NOT_IN_CHAT, NOT_REGISTERED, PASSWORD,
+                       PASSWORED_CHANGED, PORT, PRIVATE, REGISTERED,
+                       REGISTRATION, REGISTRATION_FAILED, RETRY, RULES,
+                       SUCCESSFULLY_AUTHORIZED, SUCCESSFULLY_REGISTERED,
+                       USER_EQ, USER_SUCCESSFULLY_ADDED, USERNAME,
+                       WRONG_COMMAND, YOU_SUCCESSFULLY_ADDED)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -55,6 +54,9 @@ class Server:
         self.address_writer_reader[address] = (writer, reader)
         login: str = await self.greeting_client(address)
 
+        if not login:
+            return
+
         logger.info(
             'Client connected at %(address)s as %(login)s',
             {'address': address, 'login': login}
@@ -65,40 +67,51 @@ class Server:
         except Exception as error:
             logger.error(error)
         await self.get_short_history(login, address)
-
         while True:
             msg: str = await self.read_msg(address)
             if not msg:
                 break  # User disconnection
-            elif msg.startswith(PRIVATE):
-                await self.private_msg(msg, login, address)
-            elif msg.startswith(CREATE):
-                await self.write_msg_to_myself(msg, address, login)
-                await self.create_chat(msg, login)
-            elif msg.startswith(JOIN):
-                await self.write_msg_to_myself(msg, address, login)
-                await self.join_chat(msg, login)
-            elif msg.startswith(CHAT):
-                await self.write_msg_to_myself(msg, address, login)
-                await self.chat_msg(msg, login)
-            elif msg == CHATS:
-                await self.write_msg_to_myself(msg + '\n', address, login)
-                await self.show_chats(login)
-            elif msg.startswith(ADD) and ' ' + USER_EQ in msg \
-                    and ' ' + CHAT_EQ in msg:
-                await self.write_msg_to_myself(msg, address, login)
-                await self.add_to_chat(msg, login)
-            elif msg.startswith('/'):
-                await self.write_msg_to_myself(msg, address, login)
-                await self.write_msg_to_address(WRONG_COMMAND, address)
-            else:
-                msg_to_save: str = login + ': ' + msg
-                self.short_history.append(msg_to_save)
-                await self.public_msg(msg, login, address)
+            match msg.split():
+                case ['/create', *words] if words:
+                    await self.write_msg_to_myself(msg, address, login)
+                    await self.create_chat(msg, login)
+                case ['/join', *words] if words:
+                    await self.write_msg_to_myself(msg, address, login)
+                    await self.join_chat(msg, login)
+                case ['/chat', *words] if words:
+                    await self.write_msg_to_myself(msg, address, login)
+                    await self.chat_msg(msg, login, address)
+                case ['/silent_chat', *words] if '/chat' in msg:
+                    command = msg.replace('/silent_chat ', '')
+                    await self.chat_msg(command, login, address)
+                case ['/chats']:
+                    await self.write_msg_to_myself(msg + '\n', address, login)
+                    await self.show_chats(login)
+                case ['/add', *words] if all(
+                        word in msg for word in [USER_EQ, CHAT_EQ]
+                ):
+                    await self.write_msg_to_myself(msg, address, login)
+                    await self.add_to_chat(msg, login)
+                case ['/exit']:
+                    pass
+                case [*words] if msg.startswith('/'):
+                    await self.write_msg_to_myself(msg, address, login)
+                    await self.write_msg_to_address(WRONG_COMMAND, address)
+                case [*words] if (
+                        ' ' in msg and len(words[0]) > 1
+                        and words[0][0] == PRIVATE
+                ):
+                    await self.private_msg(msg, login, address)
+                case _:
+                    msg_to_save: str = login + ': ' + msg
+                    self.short_history.append(msg_to_save)
+                    await self.public_msg(msg, login, address)
 
         self.delete_login_address(login, address)
         # Не понял ваш комментарий. Это и есть отдельный метод.
         # Он удаляет из отключившиеся клиенты пользователя из списка
+        # Отключение клиента происходит в условии над блоком match
+        # (там даже пояснение есть)
         writer.close()
 
         logger.info(
@@ -111,11 +124,16 @@ class Server:
         """Greeting new clients on server."""
         await self.write_msg_to_address(GREETING, address)
         while True:
-            match answer := await self.read_msg(address):
+            answer = await self.read_msg(address)
+            if not answer:
+                # if client disconnected during greeting
+                return ''
+            match answer:
                 # Я сделал, как вы попросили, но в таком решении
-                # мне не нравятся два момента:
+                # мне не нравятся 2 момента:
                 # 1) в конструкции case я не могу использовать переменные,
                 # в частности REGISTRATION и AUTHORIZATION
+                # при выполнении которого будет исполнен код
                 # 2) конструкция match мне подчеркивается линтером,
                 # так как answer больше нигде не используется ¯\_(ツ)_/¯
                 case '/register':
@@ -127,7 +145,7 @@ class Server:
             await self.write_msg_to_address(WRONG_COMMAND + RETRY, address)
         return login
 
-    def check_if_registered(self, login: str, password: str = None) -> bool:
+    def check_if_registered(self, login: str, password: str = False) -> bool:
         """Checking if the user is registered and the password is correct"""
         # Checking if the user is registered:
         if login in self.login_password.keys():
@@ -294,7 +312,7 @@ class Server:
                         admin
                     )
                     await self.write_msg(
-                        f'<Введите "{ADD}{USER_EQ}{login} {CHAT_EQ}'
+                        f'<Введите "{ADD} {USER_EQ}{login} {CHAT_EQ}'
                         f'{chat}" чтобы добавить пользователя в чат> \n',
                         admin
                     )
@@ -337,55 +355,55 @@ class Server:
                     {'user': user, 'chat': chat, 'admin': admin}
                 )
 
-    async def chat_msg(self, msg: str, login: str) -> None:
+    async def chat_msg(self, msg: str, login: str, address: str) -> None:
         """Send all messages of a user to a private chat."""
         chat_msg: str = ''
         chat: str = msg.split(' ', maxsplit=1)[1]
         if chat in self.chat_logins.keys():
             if login in self.chat_logins[chat][1]:
-                await self.write_msg(CHAT_CONNECTED, login)
+                await self.write_msg_to_address(CHAT_CONNECTED, address)
                 logger.info(
                     'User "%(login)s" connected to private chat '
-                    '"%(chat)s"',
-                    {'login': login, 'chat': chat}
+                    '"%(chat)s" at %(address)s',
+                    {'login': login, 'chat': chat, 'address': address}
                 )
 
-                for address in self.login_address[login]:
-                    while chat_msg != EXIT:
+                # for address in self.login_address[login]:
+                while chat_msg != EXIT:
 
-                        chat_msg = await self.read_msg(address)
+                    chat_msg = await self.read_msg(address)
 
-                        if not chat_msg:
-                            logger.error(
-                                'KeyboardInterrupt: login=%(login)s',
-                                {'login': login}
-                            )
-                            break
-
-                        if chat_msg == EXIT:
-                            break
-
-                        msg_to_chat = login + ': ' + chat_msg + \
-                            ' | private chat ' + chat
-                        for user in self.chat_logins[chat][1]:
-                            if user != login:
-                                if self.login_address[user]:
-                                    await self.write_msg(msg_to_chat, user)
-
-                        msg_to_myself = ME + ': ' + chat_msg + \
-                            ' | private chat ' + chat
-                        await self.write_msg_to_myself(
-                            msg_to_myself, address, login
+                    if not chat_msg:
+                        logger.error(
+                            'KeyboardInterrupt at %(address)s',
+                            {'address': address}
                         )
+                        break
 
-                await self.write_msg(
+                    elif chat_msg == EXIT:
+                        await self.write_msg_to_myself(EXIT, address, login)
+                        break
+
+                    msg_to_chat = (
+                        f'{login}: {chat_msg} | private chat "{chat}"'
+                    )
+                    for user in self.chat_logins[chat][1]:
+                        if user != login:
+                            if self.login_address[user]:
+                                await self.write_msg(msg_to_chat, user)
+
+                    await self.write_msg_to_myself(
+                        chat_msg, address, login
+                    )
+
+                await self.write_msg_to_address(
                     DISCONNECT_FROM_CHAT,
-                    login
+                    address
                 )
                 logger.info(
                     'User "%(login)s" disconnected from private '
-                    'chat "%(chat)s"',
-                    {'login': login, 'chat': chat}
+                    '"%(chat)s" at %(address)s',
+                    {'login': login, 'chat': chat, 'address': address}
                 )
 
             else:
@@ -419,7 +437,8 @@ class Server:
                 self.address_writer_reader[address][1]
             data: bytes = await reader.read(MAXBYTES)
             if not data:
-                logger.error('Reader did not read message')
+                logger.error('Reader did not read message at %(address)s',
+                             {'address': address})
                 pass
             answer = data.decode()
         except Exception as error:
@@ -443,10 +462,11 @@ class Server:
 
     async def write_msg_to_myself(
             self, msg: str, current_address: str, login: str) -> None:
-        addresses: list[str] = self.login_address[login]
-        for address in addresses:
-            if address != current_address:
-                await self.write_msg_to_address(msg, address)
+        if not msg.startswith('/silent_chat'):
+            addresses: list[str] = self.login_address[login]
+            for address in addresses:
+                if address != current_address:
+                    await self.write_msg_to_address(msg, address)
 
     async def public_msg(
             self, msg: str, current_login: str, current_address: str) -> None:
@@ -455,12 +475,11 @@ class Server:
         """
         for login in self.login_address.keys():
             if login == current_login:
-                msg_to_myself = ME + ': ' + msg + ' | public chat'
                 await self.write_msg_to_myself(
-                    msg_to_myself, current_address, login
+                    msg, current_address, login
                 )
             else:
-                msg_to_all = current_login + ': ' + msg + ' | public chat'
+                msg_to_all = f'{current_login}: {msg} | public chat'
                 await self.write_msg(
                     msg_to_all, login
                 )
@@ -475,16 +494,15 @@ class Server:
             login, clear_msg = string.split(' ', maxsplit=1)
             if login == current_login:
                 # Chatting to myself
-                msg_to_myself: str = ME + ': ' + clear_msg + ' | private msg'
                 await self.write_msg_to_myself(
-                    msg_to_myself, current_address, login)
+                    clear_msg, current_address, login)
             else:
                 if login in self.login_address.keys():
                     msg_to_send: str = \
-                        current_login + ': ' + clear_msg + ' | private msg'
+                        f'{current_login}: {clear_msg} | private msg'
                     await self.write_msg(msg_to_send, login)
                     msg_to_myself = \
-                        ME + ': ' + clear_msg + ' | private msg'
+                        f'{clear_msg} | private msg'
                     # Writing also to other client of user
                     await self.write_msg_to_myself(
                         msg_to_myself, current_address, current_login)
