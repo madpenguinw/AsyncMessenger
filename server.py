@@ -3,8 +3,6 @@ import logging
 from asyncio.streams import StreamReader, StreamWriter
 from collections import deque
 
-# импорт ниже используется, хоть и не подсвечен.
-# Я импортирую в этот файл необходимый для логирования код из файла app_logger
 import app_logger
 from constants import (ADD, ALREADY_IN_CHAT, AUTHORIZATION,
                        AUTHORIZATION_FAILED, CHAT_CONNECTED, CHAT_CREATED,
@@ -111,10 +109,6 @@ class Server:
                     await self.public_msg(msg, login, address)
 
         self.delete_login_address(login, address)
-        # Не понял ваш комментарий. Это и есть отдельный метод.
-        # Он удаляет из отключившиеся клиенты пользователя из списка
-        # Отключение клиента происходит в условии над блоком match
-        # (там даже пояснение есть)
         writer.close()
 
         logger.info(
@@ -132,9 +126,6 @@ class Server:
                 # if client disconnected during greeting
                 return ''
             match answer:
-                # Я исправил замечание, но в таком решении мне не нравится,
-                # что в конструкции match-case я не могу использоать
-                # переменные, в частности REGISTRATION и AUTHORIZATION
                 case '/register':
                     login: str = await self.registration(address)
                     break
